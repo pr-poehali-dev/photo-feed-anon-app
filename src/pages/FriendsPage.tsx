@@ -3,6 +3,8 @@ import { useApp } from "@/App";
 import Icon from "@/components/ui/icon";
 import { useNavigate } from "react-router-dom";
 
+const FALLBACK = "https://cdn.poehali.dev/files/48ece15d-d73e-43d2-adcb-28d8dd569f2d.jpg";
+
 export default function FriendsPage() {
   const { currentUser, users, setCurrentUser, setUsers, addNotification } = useApp();
   const navigate = useNavigate();
@@ -18,18 +20,19 @@ export default function FriendsPage() {
       !currentUser.blocked.includes(u.id)
   );
 
-  const searchResults = searchQuery.trim()
+  const searchResults = searchQuery.trim().length >= 1
     ? users.filter(
         u => u.id !== currentUser.id &&
           !currentUser.blocked.includes(u.id) &&
           (
-            u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            u.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+            u.username.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+            u.displayName.toLowerCase().includes(searchQuery.trim().toLowerCase())
           )
       )
     : [];
 
   const handleAdd = (userId: string) => {
+    if (currentUser.friends.includes(userId)) return;
     const updated = { ...currentUser, friends: [...currentUser.friends, userId] };
     setCurrentUser(updated);
     setUsers((prev) => prev.map(u => u.id === currentUser.id ? updated : u));
@@ -88,7 +91,7 @@ export default function FriendsPage() {
               {searchResults.map(user => (
                 <div key={user.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 animate-fade-in">
                   <button onClick={() => navigate(`/profile/${user.id}`)}>
-                    <img src={user.avatar} alt={user.displayName} className="w-12 h-12 rounded-full bg-muted hover-scale" />
+                    <img src={user.avatar || FALLBACK} alt={user.displayName} className="w-12 h-12 rounded-full object-cover bg-muted hover-scale" />
                   </button>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{user.displayName}</p>
@@ -140,7 +143,7 @@ export default function FriendsPage() {
                 {friends.map(user => (
                   <div key={user.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 animate-fade-in">
                     <button onClick={() => navigate(`/profile/${user.id}`)}>
-                      <img src={user.avatar} alt={user.displayName} className="w-12 h-12 rounded-full bg-muted hover-scale" />
+                      <img src={user.avatar || FALLBACK} alt={user.displayName} className="w-12 h-12 rounded-full object-cover bg-muted hover-scale" />
                     </button>
                     <div className="flex-1">
                       <p className="font-semibold text-sm">{user.displayName}</p>
@@ -176,7 +179,7 @@ export default function FriendsPage() {
                 {suggestions.map(user => (
                   <div key={user.id} className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 animate-fade-in">
                     <button onClick={() => navigate(`/profile/${user.id}`)}>
-                      <img src={user.avatar} alt={user.displayName} className="w-12 h-12 rounded-full bg-muted hover-scale" />
+                      <img src={user.avatar || FALLBACK} alt={user.displayName} className="w-12 h-12 rounded-full object-cover bg-muted hover-scale" />
                     </button>
                     <div className="flex-1">
                       <p className="font-semibold text-sm">{user.displayName}</p>
