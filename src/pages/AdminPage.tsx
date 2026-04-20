@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp, BanInfo, NitroProfile, AccentColor } from "@/App";
 import Icon from "@/components/ui/icon";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,41 @@ const BADGES = [
   { id: "mod",   label: "Mod",    emoji: "🛡" },
 ];
 
+const ONLINE_TTL = 2 * 60 * 1000; // 2 минуты = онлайн
+
+function getOnlineUsers(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem("online_heartbeats") || "{}");
+  } catch { return {}; }
+}
+
+function countOnline(): number {
+  const now = Date.now();
+  const beats = getOnlineUsers();
+  return Object.values(beats).filter(ts => now - ts < ONLINE_TTL).length;
+}
+
+// Hook для heartbeat текущего пользователя
+function useHeartbeat(userId: string | undefined) {
+  useEffect(() => {
+    if (!userId) return;
+    const write = () => {
+      const beats = getOnlineUsers();
+      beats[userId] = Date.now();
+      localStorage.setItem("online_heartbeats", JSON.stringify(beats));
+    };
+    write();
+    const interval = setInterval(write, 30_000);
+    return () => {
+      clearInterval(interval);
+      // Mark offline on leave
+      const beats = getOnlineUsers();
+      delete beats[userId];
+      localStorage.setItem("online_heartbeats", JSON.stringify(beats));
+    };
+  }, [userId]);
+}
+
 export default function AdminPage() {
   const { currentUser, users, setUsers, setCurrentUser, posts, setPosts, messages, setMessages } = useApp();
   const navigate = useNavigate();
@@ -23,6 +58,13 @@ export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(currentUser?.isAdmin || false);
   const [codeError, setCodeError] = useState("");
   const [activeTab, setActiveTab] = useState<AdminTab>("stats");
+  const [onlineCount, setOnlineCount] = useState(countOnline);
+
+  // Обновляем счётчик каждые 10 секунд
+  useEffect(() => {
+    const interval = setInterval(() => setOnlineCount(countOnline()), 10_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Ban modal
   const [banTarget, setBanTarget] = useState<string | null>(null);
@@ -165,7 +207,7 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center">
           <Icon name="Shield" size={20} className="text-primary" />
         </div>
@@ -173,6 +215,21 @@ export default function AdminPage() {
           <h1 className="text-2xl font-black tracking-tight">Админ-панель</h1>
           <p className="text-xs text-muted-foreground">Полный контроль над платформой</p>
         </div>
+      </div>
+
+      {/* Online banner */}
+      <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-2xl px-4 py-3 mb-5 animate-fade-in">
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+        </span>
+        <div className="flex-1">
+          <span className="font-bold text-green-600 dark:text-green-400 text-sm">
+            {onlineCount} {onlineCount === 1 ? "человек" : onlineCount >= 2 && onlineCount <= 4 ? "человека" : "человек"} онлайн
+          </span>
+          <span className="text-xs text-muted-foreground ml-2">прямо сейчас</span>
+        </div>
+        <span className="text-xs text-muted-foreground">обновл. 10с</span>
       </div>
 
       {/* Tabs */}
@@ -193,6 +250,26 @@ export default function AdminPage() {
       {/* Stats */}
       {activeTab === "stats" && (
         <div className="grid grid-cols-2 gap-4 animate-fade-in">
+          {/* Online card — special */}
+          <div className="col-span-2 bg-gradient-to-br from-green-500/15 to-emerald-500/5 border border-green-500/30 rounded-2xl p-5 flex items-center gap-4">
+            <div className="relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+              <span className="relative flex w-12 h-12 bg-green-500/20 rounded-full items-center justify-center">
+                <Icon name="Wifi" size={22} className="text-green-500" />
+              </span>
+            </div>
+            <div>
+              <p className="text-4xl font-black text-green-500 dark:text-green-400">{onlineCount}</p>
+              <p className="text-sm text-muted-foreground">
+                {onlineCount === 1 ? "человек онлайн" : onlineCount >= 2 && onlineCount <= 4 ? "человека онлайн" : "человек онлайн"}
+              </p>
+            </div>
+            <div className="ml-auto text-right">
+              <p className="text-xs text-muted-foreground">из {users.length} зарегистрированных</p>
+              <p className="text-xs text-muted-foreground mt-0.5">обновляется каждые 10 сек</p>
+            </div>
+          </div>
+
           {[
             { label: "Пользователей", value: users.length, icon: "Users", color: "text-blue-500" },
             { label: "Публикаций", value: posts.length, icon: "Image", color: "text-purple-500" },

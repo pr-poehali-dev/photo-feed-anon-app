@@ -182,6 +182,28 @@ function AppProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem("currentUser");
   }, [currentUser]);
 
+  // Heartbeat: пишем время активности текущего пользователя
+  useEffect(() => {
+    if (!currentUser) return;
+    const writeHb = () => {
+      try {
+        const beats = JSON.parse(localStorage.getItem("online_heartbeats") || "{}");
+        beats[currentUser.id] = Date.now();
+        localStorage.setItem("online_heartbeats", JSON.stringify(beats));
+      } catch { /* ignore */ }
+    };
+    writeHb();
+    const iv = setInterval(writeHb, 30_000);
+    return () => {
+      clearInterval(iv);
+      try {
+        const beats = JSON.parse(localStorage.getItem("online_heartbeats") || "{}");
+        delete beats[currentUser.id];
+        localStorage.setItem("online_heartbeats", JSON.stringify(beats));
+      } catch { /* ignore */ }
+    };
+  }, [currentUser?.id]);
+
   useEffect(() => { localStorage.setItem("users_v2", JSON.stringify(users)); }, [users]);
   useEffect(() => { localStorage.setItem("posts_v2", JSON.stringify(posts)); }, [posts]);
   useEffect(() => { localStorage.setItem("messages_v2", JSON.stringify(messages)); }, [messages]);
