@@ -6,10 +6,9 @@ import { useSearchParams } from "react-router-dom";
 export default function MessagesPage() {
   const { currentUser, users, messages, setMessages, addNotification } = useApp();
   const [searchParams] = useSearchParams();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(
-    searchParams.get("with")
-  );
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(searchParams.get("with"));
   const [text, setText] = useState("");
+  const [spamCooldown, setSpamCooldown] = useState(false);
   const spamRef = useRef<number[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +33,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (selectedUserId) {
-      setMessages(messages.map(m =>
+      setMessages((prev) => (prev as Message[]).map(m =>
         m.fromId === selectedUserId && m.toId === currentUser?.id
           ? { ...m, read: true }
           : m
@@ -47,29 +46,35 @@ export default function MessagesPage() {
   }, [selectedUserId, messages.length]);
 
   const sendMessage = () => {
-    if (!text.trim() || !currentUser || !selectedUserId) return;
+    if (!text.trim() || !currentUser || !selectedUserId || spamCooldown) return;
 
     const now = Date.now();
-    spamRef.current = spamRef.current.filter(t => now - t < 45000);
-    if (spamRef.current.length >= 5) {
-      alert("Антиспам: подожди 45 секунд");
+    // Anti-spam: max 7 messages per 5 seconds → 5 sec cooldown
+    spamRef.current = spamRef.current.filter(t => now - t < 5000);
+    if (spamRef.current.length >= 7) {
+      setSpamCooldown(true);
+      setTimeout(() => setSpamCooldown(false), 5000);
       return;
     }
     spamRef.current.push(now);
 
     const newMsg: Message = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random(),
       fromId: currentUser.id,
       toId: selectedUserId,
       text: text.trim(),
       createdAt: now,
       read: false,
     };
-    setMessages([...messages, newMsg]);
+    setMessages((prev) => [...(prev as Message[]), newMsg]);
+
+    // Notify recipient (not yourself)
     addNotification({
       type: "message",
-      fromUsername: currentUser.username,
-      text: `написал(а) тебе: "${text.trim().slice(0, 30)}"`,
+      fromUsername: currentUser.displayName,
+      fromAvatar: currentUser.avatar,
+      text: `написал(а) тебе сообщение`,
+      targetUserId: selectedUserId,
     });
     setText("");
   };
@@ -179,17 +184,23 @@ export default function MessagesPage() {
 
             {/* Input */}
             <div className="p-4 border-t border-border bg-card">
+              {spamCooldown && (
+                <p className="text-xs text-destructive mb-2 text-center animate-fade-in">
+                  ⏳ Слишком много сообщений — подожди 5 секунд
+                </p>
+              )}
               <div className="flex gap-2">
                 <input
                   value={text}
                   onChange={e => setText(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && sendMessage()}
-                  placeholder="Написать сообщение..."
-                  className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+                  placeholder={spamCooldown ? "Подожди 5 секунд..." : "Написать сообщение..."}
+                  disabled={spamCooldown}
+                  className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!text.trim()}
+                  disabled={!text.trim() || spamCooldown}
                   className="bg-primary text-primary-foreground p-3 rounded-xl hover:opacity-90 transition-all disabled:opacity-40"
                 >
                   <Icon name="Send" size={18} />

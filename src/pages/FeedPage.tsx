@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 const CATEGORIES = ["Все", "Аниме", "Фильмы", "Арт", "Природа", "Игры", "Спорт", "Музыка", "Другое"];
 
 export default function FeedPage() {
-  const { posts, setPosts, currentUser, users, addNotification } = useApp();
+  const { posts, setPosts, currentUser, addNotification } = useApp();
   const [activeCategory, setActiveCategory] = useState("Все");
   const [showNewPost, setShowNewPost] = useState(false);
   const navigate = useNavigate();
@@ -20,16 +20,19 @@ export default function FeedPage() {
     const post = posts.find(p => p.id === postId);
     if (!post || !currentUser) return;
     const liked = post.likes.includes(currentUser.id);
-    setPosts(posts.map(p =>
+    setPosts((prev) => prev.map(p =>
       p.id === postId
         ? { ...p, likes: liked ? p.likes.filter(id => id !== currentUser.id) : [...p.likes, currentUser.id] }
         : p
     ));
+    // Only notify the post owner, not ourselves
     if (!liked && post.userId !== currentUser.id) {
       addNotification({
         type: "like",
-        fromUsername: currentUser.username,
-        text: `поставил(а) лайк твоей фотографии`,
+        fromUsername: currentUser.displayName,
+        fromAvatar: currentUser.avatar,
+        text: "поставил(а) лайк твоей фотографии",
+        targetUserId: post.userId,
       });
     }
   };
@@ -98,7 +101,9 @@ function PostCard({ post, style, onLike, onUserClick }: {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [likeAnim, setLikeAnim] = useState(false);
+  // Anti-spam for comments: 5 per 45 seconds
   const spamRef = useRef<number[]>([]);
+  const [spamBlocked, setSpamBlocked] = useState(false);
 
   const liked = currentUser ? post.likes.includes(currentUser.id) : false;
 
@@ -110,13 +115,16 @@ function PostCard({ post, style, onLike, onUserClick }: {
 
   const handleComment = () => {
     if (!currentUser || !commentText.trim()) return;
+
     const now = Date.now();
     spamRef.current = spamRef.current.filter(t => now - t < 45000);
     if (spamRef.current.length >= 5) {
-      alert("Антиспам: подожди 45 секунд перед следующим комментарием");
+      setSpamBlocked(true);
+      setTimeout(() => setSpamBlocked(false), 5000);
       return;
     }
     spamRef.current.push(now);
+
     const newComment: Comment = {
       id: Date.now().toString(),
       userId: currentUser.id,
@@ -124,14 +132,17 @@ function PostCard({ post, style, onLike, onUserClick }: {
       text: commentText.trim(),
       createdAt: now,
     };
-    setPosts(posts.map(p =>
+    setPosts((prev) => prev.map(p =>
       p.id === post.id ? { ...p, comments: [...p.comments, newComment] } : p
     ));
+    // Only notify post owner, not self
     if (post.userId !== currentUser.id) {
       addNotification({
         type: "comment",
-        fromUsername: currentUser.username,
-        text: `прокомментировал(а): "${commentText.trim().slice(0, 30)}"`,
+        fromUsername: currentUser.displayName,
+        fromAvatar: currentUser.avatar,
+        text: `прокомментировал(а) твоё фото: «${commentText.trim().slice(0, 40)}»`,
+        targetUserId: post.userId,
       });
     }
     setCommentText("");
@@ -184,7 +195,7 @@ function PostCard({ post, style, onLike, onUserClick }: {
             className={`flex items-center gap-1.5 transition-all ${likeAnim ? "heart-beat" : ""}`}
           >
             <Icon
-              name={liked ? "Heart" : "Heart"}
+              name="Heart"
               size={22}
               className={liked ? "text-red-500 fill-red-500" : "text-muted-foreground hover:text-red-400"}
             />
@@ -224,17 +235,21 @@ function PostCard({ post, style, onLike, onUserClick }: {
                 value={commentText}
                 onChange={e => setCommentText(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleComment()}
-                placeholder="Комментарий..."
-                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder={spamBlocked ? "⏳ Подожди немного..." : "Комментарий..."}
+                disabled={spamBlocked}
+                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
               />
               <button
                 onClick={handleComment}
-                disabled={!commentText.trim()}
+                disabled={!commentText.trim() || spamBlocked}
                 className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-all"
               >
                 <Icon name="Send" size={16} />
               </button>
             </div>
+          )}
+          {spamBlocked && (
+            <p className="text-xs text-destructive animate-fade-in">Антиспам: подожди перед следующим комментарием (5/45 сек)</p>
           )}
         </div>
       )}
@@ -243,7 +258,7 @@ function PostCard({ post, style, onLike, onUserClick }: {
 }
 
 function NewPostModal({ onClose }: { onClose: () => void }) {
-  const { currentUser, posts, setPosts } = useApp();
+  const { currentUser, setPosts } = useApp();
   const [imageUrl, setImageUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [category, setCategory] = useState("Другое");
@@ -263,7 +278,7 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
       comments: [],
       createdAt: Date.now(),
     };
-    setPosts([newPost, ...posts]);
+    setPosts((prev) => [newPost, ...prev]);
     onClose();
   };
 

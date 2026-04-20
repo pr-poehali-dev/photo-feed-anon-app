@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import MainLayout from "./components/MainLayout";
 import FeedPage from "./pages/FeedPage";
@@ -19,15 +19,22 @@ const queryClient = new QueryClient();
 
 export type Theme = "dark" | "light";
 
+export type BanInfo = {
+  until: number; // timestamp
+  reason: string;
+};
+
 export type User = {
   id: string;
   username: string;
   displayName: string;
   bio: string;
   avatar: string;
+  banner: string;
   isAdmin: boolean;
   friends: string[];
   blocked: string[];
+  ban?: BanInfo;
 };
 
 export type Post = {
@@ -65,7 +72,9 @@ export type Notification = {
   id: string;
   type: "like" | "comment" | "message" | "friend";
   fromUsername: string;
+  fromAvatar?: string;
   text: string;
+  targetUserId: string; // who should receive this notification
   createdAt: number;
   read: boolean;
 };
@@ -76,13 +85,13 @@ type AppContextType = {
   currentUser: User | null;
   setCurrentUser: (u: User | null) => void;
   users: User[];
-  setUsers: (u: User[]) => void;
+  setUsers: (u: User[] | ((prev: User[]) => User[])) => void;
   posts: Post[];
-  setPosts: (p: Post[]) => void;
+  setPosts: (p: Post[] | ((prev: Post[]) => Post[])) => void;
   messages: Message[];
-  setMessages: (m: Message[]) => void;
+  setMessages: (m: Message[] | ((prev: Message[]) => Message[])) => void;
   notifications: Notification[];
-  setNotifications: (n: Notification[]) => void;
+  setNotifications: (n: Notification[] | ((prev: Notification[]) => Notification[])) => void;
   addNotification: (n: Omit<Notification, "id" | "createdAt" | "read">) => void;
 };
 
@@ -101,6 +110,7 @@ const DEMO_USERS: User[] = [
     displayName: "Артём Космонавт",
     bio: "Люблю фотографировать звёзды 🌌",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=artem",
+    banner: "",
     isAdmin: false,
     friends: ["2", "3"],
     blocked: [],
@@ -111,6 +121,7 @@ const DEMO_USERS: User[] = [
     displayName: "Маша Фото",
     bio: "Аниме и фильмы — моя жизнь 🎌",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=masha",
+    banner: "",
     isAdmin: false,
     friends: ["1"],
     blocked: [],
@@ -121,6 +132,7 @@ const DEMO_USERS: User[] = [
     displayName: "Коля Режиссёр",
     bio: "Кино — это всё 🎬",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=kolya",
+    banner: "",
     isAdmin: false,
     friends: ["1"],
     blocked: [],
@@ -194,23 +206,28 @@ function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     return (localStorage.getItem("theme") as Theme) || "dark";
   });
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  const [currentUser, setCurrentUserState] = useState<User | null>(() => {
     const saved = localStorage.getItem("currentUser");
     return saved ? JSON.parse(saved) : null;
   });
-  const [users, setUsers] = useState<User[]>(() => {
+  const [users, setUsersState] = useState<User[]>(() => {
     const saved = localStorage.getItem("users");
-    return saved ? JSON.parse(saved) : DEMO_USERS;
+    if (saved) {
+      // ensure banner field exists
+      const parsed = JSON.parse(saved) as User[];
+      return parsed.map(u => ({ banner: "", ...u }));
+    }
+    return DEMO_USERS;
   });
-  const [posts, setPosts] = useState<Post[]>(() => {
+  const [posts, setPostsState] = useState<Post[]>(() => {
     const saved = localStorage.getItem("posts");
     return saved ? JSON.parse(saved) : DEMO_POSTS;
   });
-  const [messages, setMessages] = useState<Message[]>(() => {
+  const [messages, setMessagesState] = useState<Message[]>(() => {
     const saved = localStorage.getItem("messages");
     return saved ? JSON.parse(saved) : DEMO_MESSAGES;
   });
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
+  const [notifications, setNotificationsState] = useState<Notification[]>(() => {
     const saved = localStorage.getItem("notifications");
     return saved ? JSON.parse(saved) : [];
   });
@@ -218,6 +235,26 @@ function AppProvider({ children }: { children: ReactNode }) {
   const setTheme = (t: Theme) => {
     setThemeState(t);
     localStorage.setItem("theme", t);
+  };
+
+  const setCurrentUser = (u: User | null) => {
+    setCurrentUserState(u);
+  };
+
+  const setUsers = (u: User[] | ((prev: User[]) => User[])) => {
+    setUsersState(u);
+  };
+
+  const setPosts = (p: Post[] | ((prev: Post[]) => Post[])) => {
+    setPostsState(p);
+  };
+
+  const setMessages = (m: Message[] | ((prev: Message[]) => Message[])) => {
+    setMessagesState(m);
+  };
+
+  const setNotifications = (n: Notification[] | ((prev: Notification[]) => Notification[])) => {
+    setNotificationsState(n);
   };
 
   useEffect(() => {
@@ -236,14 +273,24 @@ function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("messages", JSON.stringify(messages)); }, [messages]);
   useEffect(() => { localStorage.setItem("notifications", JSON.stringify(notifications)); }, [notifications]);
 
+  // Sync currentUser with users list
+  useEffect(() => {
+    if (currentUser) {
+      const fresh = users.find(u => u.id === currentUser.id);
+      if (fresh && JSON.stringify(fresh) !== JSON.stringify(currentUser)) {
+        setCurrentUserState(fresh);
+      }
+    }
+  }, [users]);
+
   const addNotification = (n: Omit<Notification, "id" | "createdAt" | "read">) => {
     const newNotif: Notification = {
       ...n,
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random(),
       createdAt: Date.now(),
       read: false,
     };
-    setNotifications(prev => [newNotif, ...prev.slice(0, 49)]);
+    setNotificationsState(prev => [newNotif, ...prev.slice(0, 99)]);
   };
 
   return (
@@ -283,6 +330,27 @@ function AppRoutes() {
       <Routes>
         <Route path="*" element={<AuthPage />} />
       </Routes>
+    );
+  }
+
+  // Check if user is banned
+  if (currentUser.ban && currentUser.ban.until > Date.now()) {
+    const remaining = Math.ceil((currentUser.ban.until - Date.now()) / 60000);
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-2xl font-black mb-2">Аккаунт заблокирован</h1>
+          <p className="text-muted-foreground mb-2">Причина: {currentUser.ban.reason}</p>
+          <p className="text-sm text-muted-foreground">Осталось: {remaining} мин</p>
+          <button
+            onClick={() => { localStorage.removeItem("currentUser"); window.location.reload(); }}
+            className="mt-6 text-sm text-primary hover:underline"
+          >
+            Выйти
+          </button>
+        </div>
+      </div>
     );
   }
 
