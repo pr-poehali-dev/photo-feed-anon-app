@@ -19,8 +19,17 @@ const queryClient = new QueryClient();
 
 export type Theme = "dark" | "light";
 
+export type AccentColor = "purple" | "blue" | "pink" | "green" | "orange" | "red" | "gold";
+
+export type NitroProfile = {
+  accentColor: AccentColor;
+  profileEffect?: string; // css class or gradient name
+  animatedBanner?: boolean;
+  badge?: "nitro" | "boost" | "dev" | "mod";
+};
+
 export type BanInfo = {
-  until: number; // timestamp
+  until: number;
   reason: string;
 };
 
@@ -35,6 +44,7 @@ export type User = {
   friends: string[];
   blocked: string[];
   ban?: BanInfo;
+  nitro?: NitroProfile;
 };
 
 export type Post = {
@@ -45,7 +55,6 @@ export type Post = {
   avatar: string;
   image: string;
   caption: string;
-  category: string;
   likes: string[];
   comments: Comment[];
   createdAt: number;
@@ -55,7 +64,9 @@ export type Comment = {
   id: string;
   userId: string;
   username: string;
+  avatar: string;
   text: string;
+  image?: string;
   createdAt: number;
 };
 
@@ -74,9 +85,19 @@ export type Notification = {
   fromUsername: string;
   fromAvatar?: string;
   text: string;
-  targetUserId: string; // who should receive this notification
+  targetUserId: string;
   createdAt: number;
   read: boolean;
+};
+
+export const ACCENT_COLORS: Record<AccentColor, { label: string; css: string; hex: string }> = {
+  purple: { label: "Фиолетовый", css: "265 85% 58%", hex: "#8b5cf6" },
+  blue:   { label: "Синий",      css: "217 91% 60%", hex: "#3b82f6" },
+  pink:   { label: "Розовый",    css: "330 81% 60%", hex: "#ec4899" },
+  green:  { label: "Зелёный",    css: "142 71% 45%", hex: "#22c55e" },
+  orange: { label: "Оранжевый",  css: "25 95% 53%",  hex: "#f97316" },
+  red:    { label: "Красный",    css: "0 84% 60%",   hex: "#ef4444" },
+  gold:   { label: "Золотой",    css: "43 96% 56%",  hex: "#eab308" },
 };
 
 type AppContextType = {
@@ -103,159 +124,42 @@ export const useApp = () => {
   return ctx;
 };
 
-const DEMO_USERS: User[] = [
-  {
-    id: "1",
-    username: "artem_space",
-    displayName: "Артём Космонавт",
-    bio: "Люблю фотографировать звёзды 🌌",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=artem",
-    banner: "",
-    isAdmin: false,
-    friends: ["2", "3"],
-    blocked: [],
-  },
-  {
-    id: "2",
-    username: "masha_photo",
-    displayName: "Маша Фото",
-    bio: "Аниме и фильмы — моя жизнь 🎌",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=masha",
-    banner: "",
-    isAdmin: false,
-    friends: ["1"],
-    blocked: [],
-  },
-  {
-    id: "3",
-    username: "kolya_films",
-    displayName: "Коля Режиссёр",
-    bio: "Кино — это всё 🎬",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=kolya",
-    banner: "",
-    isAdmin: false,
-    friends: ["1"],
-    blocked: [],
-  },
-];
-
-const DEMO_POSTS: Post[] = [
-  {
-    id: "p1",
-    userId: "2",
-    username: "masha_photo",
-    displayName: "Маша Фото",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=masha",
-    image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&q=80",
-    caption: "Мой любимый аниме-персонаж всех времён 🌸",
-    category: "Аниме",
-    likes: ["1"],
-    comments: [
-      { id: "c1", userId: "3", username: "kolya_films", text: "Крутое фото!", createdAt: Date.now() - 3600000 },
-    ],
-    createdAt: Date.now() - 7200000,
-  },
-  {
-    id: "p2",
-    userId: "3",
-    username: "kolya_films",
-    displayName: "Коля Режиссёр",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=kolya",
-    image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80",
-    caption: "Вечер в кино — лучший отдых 🎬",
-    category: "Фильмы",
-    likes: ["1", "2"],
-    comments: [],
-    createdAt: Date.now() - 14400000,
-  },
-  {
-    id: "p3",
-    userId: "2",
-    username: "masha_photo",
-    displayName: "Маша Фото",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=masha",
-    image: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=600&q=80",
-    caption: "Street art always hits different 🎨",
-    category: "Арт",
-    likes: [],
-    comments: [],
-    createdAt: Date.now() - 86400000,
-  },
-];
-
-const DEMO_MESSAGES: Message[] = [
-  {
-    id: "m1",
-    fromId: "2",
-    toId: "1",
-    text: "Привет! Видел мои новые фото?",
-    createdAt: Date.now() - 3600000,
-    read: false,
-  },
-  {
-    id: "m2",
-    fromId: "3",
-    toId: "1",
-    text: "Когда следующая встреча?",
-    createdAt: Date.now() - 7200000,
-    read: true,
-  },
-];
+// Start with clean data — no AI users, no AI posts/friends
+const EMPTY_USERS: User[] = [];
+const EMPTY_POSTS: Post[] = [];
+const EMPTY_MESSAGES: Message[] = [];
 
 function AppProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    return (localStorage.getItem("theme") as Theme) || "dark";
-  });
+  const [theme, setThemeState] = useState<Theme>(() =>
+    (localStorage.getItem("theme") as Theme) || "dark"
+  );
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
     const saved = localStorage.getItem("currentUser");
     return saved ? JSON.parse(saved) : null;
   });
   const [users, setUsersState] = useState<User[]>(() => {
-    const saved = localStorage.getItem("users");
-    if (saved) {
-      // ensure banner field exists
-      const parsed = JSON.parse(saved) as User[];
-      return parsed.map(u => ({ banner: "", ...u }));
-    }
-    return DEMO_USERS;
+    const saved = localStorage.getItem("users_v2");
+    return saved ? JSON.parse(saved) : EMPTY_USERS;
   });
   const [posts, setPostsState] = useState<Post[]>(() => {
-    const saved = localStorage.getItem("posts");
-    return saved ? JSON.parse(saved) : DEMO_POSTS;
+    const saved = localStorage.getItem("posts_v2");
+    return saved ? JSON.parse(saved) : EMPTY_POSTS;
   });
   const [messages, setMessagesState] = useState<Message[]>(() => {
-    const saved = localStorage.getItem("messages");
-    return saved ? JSON.parse(saved) : DEMO_MESSAGES;
+    const saved = localStorage.getItem("messages_v2");
+    return saved ? JSON.parse(saved) : EMPTY_MESSAGES;
   });
   const [notifications, setNotificationsState] = useState<Notification[]>(() => {
-    const saved = localStorage.getItem("notifications");
+    const saved = localStorage.getItem("notifications_v2");
     return saved ? JSON.parse(saved) : [];
   });
 
-  const setTheme = (t: Theme) => {
-    setThemeState(t);
-    localStorage.setItem("theme", t);
-  };
-
-  const setCurrentUser = (u: User | null) => {
-    setCurrentUserState(u);
-  };
-
-  const setUsers = (u: User[] | ((prev: User[]) => User[])) => {
-    setUsersState(u);
-  };
-
-  const setPosts = (p: Post[] | ((prev: Post[]) => Post[])) => {
-    setPostsState(p);
-  };
-
-  const setMessages = (m: Message[] | ((prev: Message[]) => Message[])) => {
-    setMessagesState(m);
-  };
-
-  const setNotifications = (n: Notification[] | ((prev: Notification[]) => Notification[])) => {
-    setNotificationsState(n);
-  };
+  const setTheme = (t: Theme) => { setThemeState(t); localStorage.setItem("theme", t); };
+  const setCurrentUser = (u: User | null) => setCurrentUserState(u);
+  const setUsers = (u: User[] | ((prev: User[]) => User[])) => setUsersState(u);
+  const setPosts = (p: Post[] | ((prev: Post[]) => Post[])) => setPostsState(p);
+  const setMessages = (m: Message[] | ((prev: Message[]) => Message[])) => setMessagesState(m);
+  const setNotifications = (n: Notification[] | ((prev: Notification[]) => Notification[])) => setNotificationsState(n);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -263,15 +167,24 @@ function AppProvider({ children }: { children: ReactNode }) {
     else root.classList.remove("dark");
   }, [theme]);
 
+  // Apply accent color from nitro profile
+  useEffect(() => {
+    const accent = currentUser?.nitro?.accentColor || "purple";
+    const color = ACCENT_COLORS[accent];
+    document.documentElement.style.setProperty("--primary", color.css);
+    const isDark = theme === "dark";
+    document.documentElement.style.setProperty("--primary-dark", isDark ? `${color.css.split(" ")[0]} ${color.css.split(" ")[1]} ${parseInt(color.css.split(" ")[2]) + 7}%` : color.css);
+  }, [currentUser?.nitro?.accentColor, theme]);
+
   useEffect(() => {
     if (currentUser) localStorage.setItem("currentUser", JSON.stringify(currentUser));
     else localStorage.removeItem("currentUser");
   }, [currentUser]);
 
-  useEffect(() => { localStorage.setItem("users", JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem("posts", JSON.stringify(posts)); }, [posts]);
-  useEffect(() => { localStorage.setItem("messages", JSON.stringify(messages)); }, [messages]);
-  useEffect(() => { localStorage.setItem("notifications", JSON.stringify(notifications)); }, [notifications]);
+  useEffect(() => { localStorage.setItem("users_v2", JSON.stringify(users)); }, [users]);
+  useEffect(() => { localStorage.setItem("posts_v2", JSON.stringify(posts)); }, [posts]);
+  useEffect(() => { localStorage.setItem("messages_v2", JSON.stringify(messages)); }, [messages]);
+  useEffect(() => { localStorage.setItem("notifications_v2", JSON.stringify(notifications)); }, [notifications]);
 
   // Sync currentUser with users list
   useEffect(() => {
@@ -284,13 +197,12 @@ function AppProvider({ children }: { children: ReactNode }) {
   }, [users]);
 
   const addNotification = (n: Omit<Notification, "id" | "createdAt" | "read">) => {
-    const newNotif: Notification = {
+    setNotificationsState(prev => [{
       ...n,
       id: Date.now().toString() + Math.random(),
       createdAt: Date.now(),
       read: false,
-    };
-    setNotificationsState(prev => [newNotif, ...prev.slice(0, 99)]);
+    }, ...(prev as Notification[]).slice(0, 99)]);
   };
 
   return (
@@ -326,14 +238,9 @@ function AppRoutes() {
   const { currentUser } = useApp();
 
   if (!currentUser) {
-    return (
-      <Routes>
-        <Route path="*" element={<AuthPage />} />
-      </Routes>
-    );
+    return <Routes><Route path="*" element={<AuthPage />} /></Routes>;
   }
 
-  // Check if user is banned
   if (currentUser.ban && currentUser.ban.until > Date.now()) {
     const remaining = Math.ceil((currentUser.ban.until - Date.now()) / 60000);
     return (

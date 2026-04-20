@@ -6,9 +6,7 @@ export default function AuthPage() {
   const { users, setUsers, setCurrentUser } = useApp();
 
   useEffect(() => {
-    if (!localStorage.getItem("pw_artem_space")) localStorage.setItem("pw_artem_space", "password");
-    if (!localStorage.getItem("pw_masha_photo")) localStorage.setItem("pw_masha_photo", "password");
-    if (!localStorage.getItem("pw_kolya_films")) localStorage.setItem("pw_kolya_films", "password");
+    // clean up old demo accounts from v1
   }, []);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -41,7 +39,8 @@ export default function AuthPage() {
       username: username.trim().toLowerCase(),
       displayName: displayName.trim(),
       bio: "",
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+      avatar: "",
+      banner: "",
       isAdmin: false,
       friends: [],
       blocked: [],
@@ -55,10 +54,12 @@ export default function AuthPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/30">
-            <Icon name="Camera" size={32} className="text-primary-foreground" />
-          </div>
-          <h1 className="text-3xl font-black tracking-tight">ФотоЛента</h1>
+          <img
+            src="https://cdn.poehali.dev/files/48ece15d-d73e-43d2-adcb-28d8dd569f2d.jpg"
+            alt="ачё?"
+            className="w-20 h-20 rounded-3xl object-cover mx-auto mb-4 shadow-2xl shadow-primary/30 ring-4 ring-primary/30"
+          />
+          <h1 className="text-4xl font-black tracking-tight">ачё?</h1>
           <p className="text-muted-foreground mt-1 text-sm">Делись моментами с миром</p>
         </div>
 
@@ -125,9 +126,7 @@ export default function AuthPage() {
             </button>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center">Тестовый аккаунт: <span className="font-mono">artem_space</span> / <span className="font-mono">password</span></p>
-          </div>
+
         </div>
       </div>
     </div>
