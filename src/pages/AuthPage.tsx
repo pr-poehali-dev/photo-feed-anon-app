@@ -12,6 +12,7 @@ export default function AuthPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = () => {
@@ -26,7 +27,7 @@ export default function AuthPage() {
 
   const handleRegister = () => {
     setError("");
-    if (!username.trim() || !password.trim() || !displayName.trim()) {
+    if (!username.trim() || !password.trim() || !displayName.trim() || !phone.trim()) {
       setError("Заполни все поля"); return;
     }
     if (username.length < 3) { setError("Логин минимум 3 символа"); return; }
@@ -41,6 +42,7 @@ export default function AuthPage() {
       bio: "",
       avatar: "",
       banner: "",
+      phone: phone.trim(),
       isAdmin: false,
       friends: [],
       blocked: [],
@@ -83,15 +85,27 @@ export default function AuthPage() {
 
           <div className="space-y-3">
             {mode === "register" && (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Имя</label>
-                <input
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Как тебя зовут?"
-                  className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Имя</label>
+                  <input
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    placeholder="Как тебя зовут?"
+                    className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Номер телефона</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+7 999 000 00 00"
+                    className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  />
+                </div>
+              </>
             )}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Логин</label>

@@ -295,8 +295,13 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
   const { currentUser, setPosts } = useApp();
   const [imageData, setImageData] = useState("");
   const [caption, setCaption] = useState("");
+  const [privacy, setPrivacy] = useState<"public" | "friends" | "private">("public");
   const [loading, setLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [audioData, setAudioData] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -307,6 +312,32 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
     setLoading(false);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = e => chunksRef.current.push(e.data);
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = () => setAudioData(reader.result as string);
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mr.start();
+      mediaRef.current = mr;
+      setRecording(true);
+    } catch {
+      alert("Нет доступа к микрофону");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRef.current?.stop();
+    setRecording(false);
+  };
+
   const handleSubmit = () => {
     if (!currentUser) return;
     const newPost: Post = {
@@ -315,8 +346,9 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
       username: currentUser.username,
       displayName: currentUser.displayName,
       avatar: currentUser.avatar,
-      image: imageData,
+      image: audioData ? audioData : imageData,
       caption: caption.trim(),
+      privacy,
       likes: [],
       comments: [],
       createdAt: Date.now(),
@@ -324,6 +356,12 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
     setPosts(prev => [newPost, ...prev]);
     onClose();
   };
+
+  const privacyOptions = [
+    { value: "public",  label: "Все",       icon: "Globe" },
+    { value: "friends", label: "Друзья",    icon: "Users" },
+    { value: "private", label: "Только я",  icon: "Lock" },
+  ] as const;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-start justify-center pt-16 px-4" onClick={onClose}>
@@ -333,9 +371,25 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-full hover:bg-secondary transition-all">
             <Icon name="X" size={20} />
           </button>
+
+          {/* Privacy selector */}
+          <div className="flex items-center gap-1 bg-secondary rounded-full p-1">
+            {privacyOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setPrivacy(opt.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all
+                  ${privacy === opt.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Icon name={opt.icon} size={12} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={handleSubmit}
-            disabled={!imageData && !caption.trim()}
+            disabled={!imageData && !caption.trim() && !audioData}
             className="bg-primary text-primary-foreground px-5 py-2 rounded-full text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-all"
           >
             Опубликовать
@@ -357,44 +411,49 @@ function NewPostModal({ onClose }: { onClose: () => void }) {
               className="w-full bg-transparent text-lg outline-none resize-none placeholder:text-muted-foreground/60"
             />
 
-            {/* Image preview */}
-            {imageData && (
+            {imageData && !audioData && (
               <div className="relative mt-2">
                 <img src={imageData} className="w-full max-h-64 object-cover rounded-2xl border border-border/50" />
-                <button
-                  onClick={() => setImageData("")}
-                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black/80 transition-all"
-                >
+                <button onClick={() => setImageData("")} className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-black/80">
                   <Icon name="X" size={14} />
+                </button>
+              </div>
+            )}
+
+            {audioData && (
+              <div className="mt-2 flex items-center gap-3 bg-secondary/60 rounded-2xl px-4 py-3">
+                <Icon name="Mic" size={18} className="text-primary" />
+                <audio src={audioData} controls className="flex-1 h-8" />
+                <button onClick={() => setAudioData("")} className="text-muted-foreground hover:text-destructive">
+                  <Icon name="Trash2" size={16} />
                 </button>
               </div>
             )}
 
             {loading && (
               <div className="flex items-center gap-2 mt-2 text-muted-foreground text-sm">
-                <Icon name="Loader2" size={16} className="animate-spin" />
-                Загрузка...
+                <Icon name="Loader2" size={16} className="animate-spin" /> Загрузка...
               </div>
             )}
           </div>
         </div>
 
-        {/* Footer actions */}
+        {/* Footer */}
         <div className="px-5 py-3 border-t border-border flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFile} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-full hover:bg-primary/10 text-primary transition-all"
-            title="Загрузить фото"
-          >
+          <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full hover:bg-primary/10 text-primary transition-all" title="Загрузить фото">
             <Icon name="Image" size={22} />
           </button>
-          <button className="p-2 rounded-full hover:bg-primary/10 text-primary transition-all" title="GIF">
-            <Icon name="Film" size={22} />
+          <button
+            onClick={recording ? stopRecording : startRecording}
+            className={`p-2 rounded-full transition-all ${recording ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-primary/10 text-primary"}`}
+            title={recording ? "Остановить запись" : "Записать голосовое"}
+          >
+            <Icon name="Mic" size={22} />
           </button>
-          <button className="p-2 rounded-full hover:bg-primary/10 text-primary transition-all" title="Эмодзи">
-            <Icon name="Smile" size={22} />
-          </button>
+          {recording && (
+            <span className="text-xs text-red-500 font-semibold animate-pulse">● Запись...</span>
+          )}
         </div>
       </div>
     </div>

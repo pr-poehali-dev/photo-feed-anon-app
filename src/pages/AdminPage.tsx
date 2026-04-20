@@ -1,11 +1,19 @@
 import { useState } from "react";
-import { useApp, BanInfo } from "@/App";
+import { useApp, BanInfo, NitroProfile, AccentColor } from "@/App";
 import Icon from "@/components/ui/icon";
 import { useNavigate } from "react-router-dom";
 
 const ADMIN_CODE = "CODEGEASSIMGODREAPER";
 
 type AdminTab = "stats" | "users" | "posts" | "messages";
+
+const BADGES = [
+  { id: "none",  label: "Без значка", emoji: "—" },
+  { id: "nitro", label: "Nitro",  emoji: "✦" },
+  { id: "boost", label: "Boost",  emoji: "🚀" },
+  { id: "dev",   label: "Dev",    emoji: "🛠" },
+  { id: "mod",   label: "Mod",    emoji: "🛡" },
+];
 
 export default function AdminPage() {
   const { currentUser, users, setUsers, setCurrentUser, posts, setPosts, messages, setMessages } = useApp();
@@ -82,6 +90,17 @@ export default function AdminPage() {
 
   const handleDeleteMessage = (msgId: string) => {
     setMessages((prev) => (prev as import("@/App").Message[]).filter(m => m.id !== msgId));
+  };
+
+  const handleSetBadge = (userId: string, badge: string) => {
+    const badgeVal = badge === "none" ? undefined : badge as NitroProfile["badge"];
+    setUsers((prev) => prev.map(u => {
+      if (u.id !== userId) return u;
+      return {
+        ...u,
+        nitro: { ...(u.nitro || { accentColor: "purple" as AccentColor }), badge: badgeVal }
+      };
+    }));
   };
 
   const isBanned = (userId: string) => {
@@ -219,6 +238,24 @@ export default function AdminPage() {
                     {banned && user.ban && (
                       <p className="text-xs text-destructive mt-0.5">Причина: {user.ban.reason}</p>
                     )}
+                    {/* Badge selector */}
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground mr-1">Значок:</span>
+                      {BADGES.map(b => (
+                        <button
+                          key={b.id}
+                          onClick={() => handleSetBadge(user.id, b.id)}
+                          title={b.label}
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-all border
+                            ${(user.nitro?.badge || "none") === b.id
+                              ? "border-primary bg-primary/20 text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                            }`}
+                        >
+                          {b.emoji}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button

@@ -55,6 +55,7 @@ export type Post = {
   avatar: string;
   image: string;
   caption: string;
+  privacy: "public" | "friends" | "private";
   likes: string[];
   comments: Comment[];
   createdAt: number;
