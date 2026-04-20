@@ -34,6 +34,34 @@ export default function SettingsPage() {
   const [showPicker, setShowPicker] = useState(false);
   const [customColor, setCustomColor] = useState("#8b5cf6");
 
+  // Password change
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  const handlePasswordChange = () => {
+    setPwError("");
+    setPwSuccess(false);
+    if (!currentUser) return;
+    const stored = localStorage.getItem(`pw_${currentUser.username}`);
+    if (!stored || stored !== pwCurrent) {
+      setPwError("Неверный текущий пароль"); return;
+    }
+    if (pwNew.length < 6) {
+      setPwError("Новый пароль — минимум 6 символов"); return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError("Пароли не совпадают"); return;
+    }
+    localStorage.setItem(`pw_${currentUser.username}`, pwNew);
+    setPwSuccess(true);
+    setPwCurrent(""); setPwNew(""); setPwConfirm("");
+    setTimeout(() => { setPwSuccess(false); setShowPasswordChange(false); }, 2000);
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     navigate("/");
@@ -272,12 +300,65 @@ export default function SettingsPage() {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => navigate("/profile")}
-          className="w-full flex items-center justify-center gap-2 border border-border py-2.5 rounded-full text-sm font-semibold hover:bg-secondary transition-all"
-        >
-          <Icon name="Pencil" size={14} /> Редактировать профиль
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate("/profile")}
+            className="flex-1 flex items-center justify-center gap-2 border border-border py-2.5 rounded-full text-sm font-semibold hover:bg-secondary transition-all"
+          >
+            <Icon name="Pencil" size={14} /> Редактировать профиль
+          </button>
+          <button
+            onClick={() => setShowPasswordChange(!showPasswordChange)}
+            className="flex items-center gap-2 border border-border py-2.5 px-4 rounded-full text-sm font-semibold hover:bg-secondary transition-all"
+          >
+            <Icon name="KeyRound" size={14} /> Пароль
+          </button>
+        </div>
+
+        {/* Password change form */}
+        {showPasswordChange && (
+          <div className="mt-4 space-y-3 animate-fade-in border-t border-border pt-4">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Смена пароля</p>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Текущий пароль</label>
+              <input
+                type="password"
+                value={pwCurrent}
+                onChange={e => { setPwCurrent(e.target.value); setPwError(""); }}
+                placeholder="••••••••"
+                className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Новый пароль</label>
+              <input
+                type="password"
+                value={pwNew}
+                onChange={e => { setPwNew(e.target.value); setPwError(""); }}
+                placeholder="Минимум 6 символов"
+                className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Повтори новый пароль</label>
+              <input
+                type="password"
+                value={pwConfirm}
+                onChange={e => { setPwConfirm(e.target.value); setPwError(""); }}
+                placeholder="••••••••"
+                className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            {pwError && <p className="text-destructive text-xs font-medium">{pwError}</p>}
+            {pwSuccess && <p className="text-green-500 text-xs font-medium">✓ Пароль успешно изменён</p>}
+            <button
+              onClick={handlePasswordChange}
+              className="w-full bg-primary text-primary-foreground py-2.5 rounded-full text-sm font-bold hover:opacity-90 transition-all"
+            >
+              Сохранить пароль
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Blocked users */}

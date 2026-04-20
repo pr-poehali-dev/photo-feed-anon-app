@@ -91,6 +91,23 @@ export type Notification = {
   read: boolean;
 };
 
+export type GroupChat = {
+  id: string;
+  name: string;
+  avatar: string;
+  memberIds: string[];
+  createdBy: string;
+  createdAt: number;
+};
+
+export type VoiceChannel = {
+  id: string;
+  name: string;
+  createdBy: string;
+  createdAt: number;
+  participants: string[]; // user IDs currently "in" the channel
+};
+
 export const ACCENT_COLORS: Record<AccentColor, { label: string; css: string; hex: string }> = {
   purple: { label: "Фиолетовый", css: "265 85% 58%", hex: "#8b5cf6" },
   blue:   { label: "Синий",      css: "217 91% 60%", hex: "#3b82f6" },
@@ -115,6 +132,10 @@ type AppContextType = {
   notifications: Notification[];
   setNotifications: (n: Notification[] | ((prev: Notification[]) => Notification[])) => void;
   addNotification: (n: Omit<Notification, "id" | "createdAt" | "read">) => void;
+  groupChats: GroupChat[];
+  setGroupChats: (g: GroupChat[] | ((prev: GroupChat[]) => GroupChat[])) => void;
+  voiceChannels: VoiceChannel[];
+  setVoiceChannels: (v: VoiceChannel[] | ((prev: VoiceChannel[]) => VoiceChannel[])) => void;
 };
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -154,6 +175,14 @@ function AppProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("notifications_v2");
     return saved ? JSON.parse(saved) : [];
   });
+  const [groupChats, setGroupChatsState] = useState<GroupChat[]>(() => {
+    const saved = localStorage.getItem("groupChats_v1");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [voiceChannels, setVoiceChannelsState] = useState<VoiceChannel[]>(() => {
+    const saved = localStorage.getItem("voiceChannels_v1");
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const setTheme = (t: Theme) => { setThemeState(t); localStorage.setItem("theme", t); };
   const setCurrentUser = (u: User | null) => setCurrentUserState(u);
@@ -161,6 +190,8 @@ function AppProvider({ children }: { children: ReactNode }) {
   const setPosts = (p: Post[] | ((prev: Post[]) => Post[])) => setPostsState(p);
   const setMessages = (m: Message[] | ((prev: Message[]) => Message[])) => setMessagesState(m);
   const setNotifications = (n: Notification[] | ((prev: Notification[]) => Notification[])) => setNotificationsState(n);
+  const setGroupChats = (g: GroupChat[] | ((prev: GroupChat[]) => GroupChat[])) => setGroupChatsState(g);
+  const setVoiceChannels = (v: VoiceChannel[] | ((prev: VoiceChannel[]) => VoiceChannel[])) => setVoiceChannelsState(v);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -208,6 +239,8 @@ function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem("posts_v2", JSON.stringify(posts)); }, [posts]);
   useEffect(() => { localStorage.setItem("messages_v2", JSON.stringify(messages)); }, [messages]);
   useEffect(() => { localStorage.setItem("notifications_v2", JSON.stringify(notifications)); }, [notifications]);
+  useEffect(() => { localStorage.setItem("groupChats_v1", JSON.stringify(groupChats)); }, [groupChats]);
+  useEffect(() => { localStorage.setItem("voiceChannels_v1", JSON.stringify(voiceChannels)); }, [voiceChannels]);
 
   // Sync currentUser with users list
   useEffect(() => {
@@ -237,6 +270,8 @@ function AppProvider({ children }: { children: ReactNode }) {
       messages, setMessages,
       notifications, setNotifications,
       addNotification,
+      groupChats, setGroupChats,
+      voiceChannels, setVoiceChannels,
     }}>
       {children}
     </AppContext.Provider>
